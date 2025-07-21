@@ -51,13 +51,9 @@ impl<'a> TryFrom<&'a [u8]> for UpdateConfigAuthorityInstructionData {
     type Error = ProgramError;
 
     fn try_from(data: &'a [u8]) -> Result<Self, Self::Error> {
-        if data.len() != size_of::<[u8; 32]>() {
-            return Err(ProgramError::InvalidInstructionData);
-        }
-
-        let authority = data.try_into().unwrap();
-
-        Ok(Self { authority })
+        Ok(Self {
+            authority: data.try_into().unwrap(),
+        })
     }
 }
 
@@ -69,12 +65,9 @@ impl<'a> TryFrom<&'a [u8]> for UpdateConfigFeeInstructionData {
     type Error = ProgramError;
 
     fn try_from(data: &'a [u8]) -> Result<Self, Self::Error> {
-        if data.len() != size_of::<u16>() {
-            return Err(ProgramError::InvalidInstructionData);
-        }
-
-        let fee = u16::from_le_bytes(data.try_into().unwrap());
-        Ok(Self { fee })
+        Ok(Self {
+            fee: u16::from_le_bytes(data.try_into().unwrap()),
+        })
     }
 }
 
@@ -86,17 +79,6 @@ impl<'a> TryFrom<&'a [u8]> for UpdateConfigStatusInstructionData {
     type Error = ProgramError;
 
     fn try_from(data: &'a [u8]) -> Result<Self, Self::Error> {
-        if data.len() != size_of::<u8>() {
-            return Err(ProgramError::InvalidInstructionData);
-        }
-
-        if data[0].eq(&(AmmState::Uninitialized as u8))
-            || data[0].eq(&(AmmState::Initialized as u8))
-            || data[0].gt(&(AmmState::WithdrawOnly as u8))
-        {
-            return Err(ProgramError::InvalidInstructionData);
-        }
-
         Ok(Self { status: data[0] })
     }
 }
@@ -125,7 +107,9 @@ impl<'a> UpdateConfig<'a> {
             len if len == size_of::<UpdateConfigStatusInstructionData>() => {
                 self.process_update_status()
             }
-            len if len == size_of::<UpdateConfigFeeInstructionData>() => self.process_update_fee(),
+            len if len == size_of::<UpdateConfigFeeInstructionData>() => {
+                self.process_update_fee()
+            }
             len if len == size_of::<UpdateConfigAuthorityInstructionData>() => {
                 self.process_update_authority()
             }
@@ -136,17 +120,32 @@ impl<'a> UpdateConfig<'a> {
     pub fn process_update_authority(&mut self) -> ProgramResult {
         let instruction_data = UpdateConfigAuthorityInstructionData::try_from(self.data)?;
 
+        let mut data = self.accounts.config.try_borrow_mut_data()?;
+        let config = Config::load_mut_unchecked(&mut data)?;
+
+        unsafe { config.set_authority_unchecked(instruction_data.authority) }?;
+
         Ok(())
     }
 
     pub fn process_update_fee(&mut self) -> ProgramResult {
         let instruction_data = UpdateConfigFeeInstructionData::try_from(self.data)?;
 
+        let mut data = self.accounts.config.try_borrow_mut_data()?;
+        let config = Config::load_mut_unchecked(&mut data)?;
+
+        unsafe { config.set_fee_unchecked(instruction_data.fee) }?;
+
         Ok(())
     }
 
     pub fn process_update_status(&mut self) -> ProgramResult {
         let instruction_data = UpdateConfigStatusInstructionData::try_from(self.data)?;
+
+        let mut data = self.accounts.config.try_borrow_mut_data()?;
+        let config = Config::load_mut_unchecked(&mut data)?;
+
+        unsafe { config.set_state_unchecked(instruction_data.status) }?;
 
         Ok(())
     }

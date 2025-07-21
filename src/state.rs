@@ -79,6 +79,33 @@ impl Config {
     }
 
     #[inline(always)]
+    pub unsafe fn set_state_unchecked(&mut self, state: u8) -> Result<(), ProgramError> {
+        if state > AmmState::WithdrawOnly as u8 {
+            return Err(ProgramError::InvalidAccountData);
+        }
+
+        self.state = state;
+
+        Ok(())
+    }
+
+    pub unsafe fn set_fee_unchecked(&mut self, fee: u16) -> Result<(), ProgramError> {
+        if fee > 10000 {
+            return Err(ProgramError::InvalidAccountData);
+        }
+
+        self.fee = fee;
+
+        Ok(())
+    }
+
+    pub unsafe fn set_authority_unchecked(&mut self, authority: Pubkey) -> Result<(), ProgramError> {
+        self.authority = authority;
+
+        Ok(())
+    }
+
+    #[inline(always)]
     pub fn has_authority(&self) -> Option<Pubkey> {
         let bytes = self.authority.as_ref();
 
