@@ -23,9 +23,8 @@ use pinocchio_token::state::{Mint, TokenAccount};
 /// 5. user_x_ata                   [mut]
 /// 6. user_y_ata                   [mut]
 /// 7. user_lp_ata                  [init_if_needed]
-/// 8. config                       
-/// 9. system_program               [executable]
-/// 10. token_program                [executable]
+/// 8. config                       [mut]
+/// 9. token_program                [executable]
 ///
 /// Parameters:
 ///
@@ -195,7 +194,6 @@ impl<'a> Deposit<'a> {
 
         // Create the seeds
         let seeds_binding = config.seed.to_le_bytes();
-
         let seeds = [
             Seed::from(b"config"),
             Seed::from(&seeds_binding),

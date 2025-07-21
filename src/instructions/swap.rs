@@ -1,6 +1,7 @@
 use crate::state::Config;
 use crate::AmmState;
 use constant_product_curve::{ConstantProduct, LiquidityPair};
+use pinocchio::log::sol_log_64;
 use core::mem::size_of;
 use pinocchio::instruction::Signer;
 use pinocchio::pubkey::find_program_address;
@@ -24,8 +25,7 @@ use pinocchio_token::state::TokenAccount;
 /// 4. vault_x                      [mut]
 /// 5. vault_y                      [mut]
 /// 6. config                       
-/// 7. system_program              [executable]
-/// 8. token_program               [executable]
+/// 7. token_program               [executable]
 ///
 /// Parameters:
 ///
@@ -107,6 +107,8 @@ impl<'a> TryFrom<(&'a [u8], &'a [AccountInfo])> for Swap<'a> {
     fn try_from((data, accounts): (&'a [u8], &'a [AccountInfo])) -> Result<Self, Self::Error> {
         let accounts = SwapAccounts::try_from(accounts)?;
         let instruction_data = SwapInstructionData::try_from(data)?;
+
+        sol_log_64(2, 0, 0, 0, 0);
 
         // Return the initialized struct
         Ok(Self {

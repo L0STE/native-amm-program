@@ -1,5 +1,4 @@
 use crate::state::Config;
-use crate::AmmState;
 use core::mem::size_of;
 use pinocchio::{account_info::AccountInfo, program_error::ProgramError, ProgramResult};
 
@@ -100,16 +99,14 @@ impl<'a> TryFrom<(&'a [u8], &'a [AccountInfo])> for UpdateConfig<'a> {
 }
 
 impl<'a> UpdateConfig<'a> {
-    pub const DISCRIMINATOR: &'a u8 = &3;
+    pub const DISCRIMINATOR: &'a u8 = &4;
 
     pub fn process(&mut self) -> ProgramResult {
         match self.data.len() {
             len if len == size_of::<UpdateConfigStatusInstructionData>() => {
                 self.process_update_status()
             }
-            len if len == size_of::<UpdateConfigFeeInstructionData>() => {
-                self.process_update_fee()
-            }
+            len if len == size_of::<UpdateConfigFeeInstructionData>() => self.process_update_fee(),
             len if len == size_of::<UpdateConfigAuthorityInstructionData>() => {
                 self.process_update_authority()
             }

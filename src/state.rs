@@ -1,7 +1,7 @@
 use core::mem::size_of;
 use pinocchio::{account_info::AccountInfo, program_error::ProgramError, pubkey::Pubkey};
 
-#[repr(C)]
+#[repr(C, packed)]
 pub struct Config {
     pub state: u8,
     pub seed: u64,
@@ -25,7 +25,7 @@ impl Config {
         + size_of::<u64>()
         + size_of::<Pubkey>() * 3
         + size_of::<u16>()
-        + size_of::<u8>() * 2;
+        + size_of::<u8>();
 
     #[inline(always)]
     pub fn load(account_info: &AccountInfo) -> Result<&Self, ProgramError> {
@@ -70,6 +70,7 @@ impl Config {
         fee: u16,
         config_bump: [u8; 1],
     ) {
+        self.state = AmmState::Initialized as u8;
         self.seed = seed;
         self.authority = authority;
         self.mint_x = mint_x;
@@ -99,7 +100,10 @@ impl Config {
         Ok(())
     }
 
-    pub unsafe fn set_authority_unchecked(&mut self, authority: Pubkey) -> Result<(), ProgramError> {
+    pub unsafe fn set_authority_unchecked(
+        &mut self,
+        authority: Pubkey,
+    ) -> Result<(), ProgramError> {
         self.authority = authority;
 
         Ok(())

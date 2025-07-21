@@ -1,11 +1,7 @@
 use crate::state::Config;
 use core::mem::{size_of, MaybeUninit};
 use pinocchio::{
-    account_info::AccountInfo,
-    instruction::{Seed, Signer},
-    program_error::ProgramError,
-    sysvars::{rent::Rent, Sysvar},
-    ProgramResult,
+    account_info::AccountInfo, instruction::{Seed, Signer}, program_error::ProgramError, sysvars::{rent::Rent, Sysvar}, ProgramResult
 };
 use pinocchio_system::instructions::CreateAccount;
 use pinocchio_token::{instructions::InitializeMint2, state::Mint};
@@ -17,20 +13,20 @@ use pinocchio_token::{instructions::InitializeMint2, state::Mint};
 /// Accounts:
 ///
 /// 1. initializer:                 [signer, mut]
-/// 4. mint_lp:                     [init]
-/// 5. vault_x                      [init]
-/// 6. vault_y                      [init]
-/// 7. authority                    
-/// 8. config                       [init]
-/// 9. system_program               [executable]
-/// 10. token_program                [executable]
-/// 11. associated_token_program     [executable]
+/// 2. mint_lp:                     [init]
+/// 3. config                       [init]
+/// 4. system_program               [executable]
+/// 5. token_program                [executable]
 ///
 /// Parameters:
 ///
 /// 1. seed:          [u64]
 /// 2. fee:           [u16]
-/// 3. authority:     [Option<Pubkey>]
+/// 3. mint_x:        [Pubkey]
+/// 4. mint_y:        [Pubkey]
+/// 5. config_bump:   [u8]
+/// 6. lp_bump:       [u8]
+/// 5. authority:     [Option<Pubkey>]
 pub struct InitializeAccounts<'a> {
     pub initializer: &'a AccountInfo,
     pub mint_lp: &'a AccountInfo,
@@ -167,7 +163,7 @@ impl<'a> Initialize<'a> {
             to: self.accounts.mint_lp,
             lamports: mint_lamports,
             space: mint_size as u64,
-            owner: &crate::ID,
+            owner: &pinocchio_token::ID,
         }
         .invoke_signed(&[Signer::from(&mint_lp_seeds)])?;
 
