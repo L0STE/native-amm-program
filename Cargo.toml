@@ -1,0 +1,19 @@
+[package]
+name = "native-amm-program"
+version = "0.1.0"
+edition = "2021"
+
+[features]
+default = ["perf"]
+perf = []
+
+[lib]
+crate-type = ["lib", "cdylib"]
+
+[dependencies]
+pinocchio = "0.7.1"
+pinocchio-associated-token-account = "0.1.0"
+pinocchio-system = "0.2.1"
+pinocchio-token = "0.2.1"
+constant-product-curve = { git = "https://github.com/deanmlittle/constant-product-curve.git" }
+
