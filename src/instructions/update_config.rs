@@ -117,10 +117,9 @@ impl<'a> UpdateConfig<'a> {
     pub fn process_update_authority(&mut self) -> ProgramResult {
         let instruction_data = UpdateConfigAuthorityInstructionData::try_from(self.data)?;
 
-        let mut data = self.accounts.config.try_borrow_mut_data()?;
-        let config = Config::load_mut_unchecked(&mut data)?;
+        let mut config = Config::load_mut(self.accounts.config)?;
 
-        unsafe { config.set_authority_unchecked(instruction_data.authority) }?;
+        config.set_authority(instruction_data.authority);
 
         Ok(())
     }
@@ -128,10 +127,9 @@ impl<'a> UpdateConfig<'a> {
     pub fn process_update_fee(&mut self) -> ProgramResult {
         let instruction_data = UpdateConfigFeeInstructionData::try_from(self.data)?;
 
-        let mut data = self.accounts.config.try_borrow_mut_data()?;
-        let config = Config::load_mut_unchecked(&mut data)?;
+        let mut config = Config::load_mut(self.accounts.config)?;
 
-        unsafe { config.set_fee_unchecked(instruction_data.fee) }?;
+        config.set_fee(instruction_data.fee)?;
 
         Ok(())
     }
@@ -139,10 +137,9 @@ impl<'a> UpdateConfig<'a> {
     pub fn process_update_status(&mut self) -> ProgramResult {
         let instruction_data = UpdateConfigStatusInstructionData::try_from(self.data)?;
 
-        let mut data = self.accounts.config.try_borrow_mut_data()?;
-        let config = Config::load_mut_unchecked(&mut data)?;
+        let mut config = Config::load_mut(self.accounts.config)?;
 
-        unsafe { config.set_state_unchecked(instruction_data.status) }?;
+        config.set_state(instruction_data.status)?;
 
         Ok(())
     }

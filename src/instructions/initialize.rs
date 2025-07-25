@@ -1,5 +1,5 @@
 use crate::state::Config;
-use core::mem::{size_of, MaybeUninit};
+use core::mem::size_of;
 use pinocchio::{
     account_info::AccountInfo, instruction::{Seed, Signer}, program_error::ProgramError, sysvars::{rent::Rent, Sysvar}, ProgramResult
 };
@@ -50,7 +50,6 @@ impl<'a> TryFrom<&'a [AccountInfo]> for InitializeAccounts<'a> {
     }
 }
 
-#[repr(C, packed)]
 pub struct InitializeInstructionData {
     pub seed: u64,
     pub fee: u16,
@@ -58,33 +57,53 @@ pub struct InitializeInstructionData {
     pub mint_y: [u8; 32],
     pub config_bump: [u8; 1],
     pub lp_bump: [u8; 1],
-    pub authority: [u8; 32],
+    pub authority: Option<[u8; 32]>,
 }
 
 impl TryFrom<&[u8]> for InitializeInstructionData {
     type Error = ProgramError;
 
     fn try_from(data: &[u8]) -> Result<Self, Self::Error> {
-        const INITIALIZE_DATA_LEN_WITH_AUTHORITY: usize = size_of::<InitializeInstructionData>();
-        const INITIALIZE_DATA_LEN: usize =
-            INITIALIZE_DATA_LEN_WITH_AUTHORITY - size_of::<[u8; 32]>();
+        const INITIALIZE_DATA_LEN_WITHOUT_AUTHORITY: usize = size_of::<u64>() + size_of::<u16>() + size_of::<[u8; 32]>() * 2 + size_of::<[u8; 1]>() * 2;
+        const INITIALIZE_DATA_LEN_WITH_AUTHORITY: usize = INITIALIZE_DATA_LEN_WITHOUT_AUTHORITY + size_of::<[u8; 32]>();
 
         match data.len() {
             INITIALIZE_DATA_LEN_WITH_AUTHORITY => {
-                Ok(unsafe { (data.as_ptr() as *const Self).read_unaligned() })
+                let seed = u64::from_le_bytes(data[0..8].try_into().unwrap());
+                let fee = u16::from_le_bytes(data[8..10].try_into().unwrap());
+                let mint_x = data[10..42].try_into().unwrap();
+                let mint_y = data[42..74].try_into().unwrap();
+                let config_bump: [u8; 1] = data[74..75].try_into().unwrap();
+                let lp_bump: [u8; 1] = data[75..76].try_into().unwrap();
+                let authority = data[76..108].try_into().unwrap();
+
+                Ok(Self {
+                    seed,
+                    fee,
+                    mint_x,
+                    mint_y,
+                    config_bump,
+                    lp_bump,
+                    authority: Some(authority),
+                })
             }
             INITIALIZE_DATA_LEN => {
-                // If the authority is not present, we need to build the buffer and add it at the end before transmuting to the struct
-                let mut raw: MaybeUninit<[u8; INITIALIZE_DATA_LEN]> = MaybeUninit::uninit();
-                let raw_ptr = raw.as_mut_ptr() as *mut u8;
-                unsafe {
-                    // Copy the provided data
-                    core::ptr::copy_nonoverlapping(data.as_ptr(), raw_ptr, INITIALIZE_DATA_LEN);
-                    // Add the authority to the end of the buffer
-                    core::ptr::write_bytes(raw_ptr.add(INITIALIZE_DATA_LEN), 0, 32);
-                    // Now transmute to the struct
-                    Ok((raw.as_ptr() as *const Self).read_unaligned())
-                }
+                let seed = u64::from_le_bytes(data[0..8].try_into().unwrap());
+                let fee = u16::from_le_bytes(data[8..10].try_into().unwrap());
+                let mint_x = data[10..42].try_into().unwrap();
+                let mint_y = data[42..74].try_into().unwrap();
+                let config_bump: [u8; 1] = data[74..75].try_into().unwrap();
+                let lp_bump: [u8; 1] = data[75..76].try_into().unwrap();
+
+                Ok(Self {
+                    seed,
+                    fee,
+                    mint_x,
+                    mint_y,
+                    config_bump,
+                    lp_bump,
+                    authority: None,
+                })
             }
             _ => Err(ProgramError::InvalidInstructionData),
         }
@@ -101,7 +120,7 @@ impl<'a> TryFrom<(&'a [u8], &'a [AccountInfo])> for Initialize<'a> {
 
     fn try_from((data, accounts): (&'a [u8], &'a [AccountInfo])) -> Result<Self, Self::Error> {
         let accounts = InitializeAccounts::try_from(accounts)?;
-        let instruction_data = InitializeInstructionData::try_from(data)?;
+        let instruction_data: InitializeInstructionData = InitializeInstructionData::try_from(data)?;
 
         Ok(Self {
             accounts,
@@ -136,17 +155,17 @@ impl<'a> Initialize<'a> {
         .invoke_signed(&[Signer::from(&config_seeds)])?;
 
         let config = unsafe {
-            Config::load_mut_unchecked(self.accounts.config.borrow_mut_data_unchecked())
+            Config::load_mut_unchecked(self.accounts.config)
         }?;
 
         config.set_inner(
             self.instruction_data.seed,
-            self.instruction_data.authority,
+            self.instruction_data.authority.unwrap_or_default(),
             self.instruction_data.mint_x,
             self.instruction_data.mint_y,
             self.instruction_data.fee,
             self.instruction_data.config_bump,
-        );
+        )?;
 
         // Create the mint_lp account
         let mint_lp_seeds = [

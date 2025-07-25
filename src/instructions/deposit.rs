@@ -69,7 +69,6 @@ impl<'a> TryFrom<&'a [AccountInfo]> for DepositAccounts<'a> {
     }
 }
 
-#[repr(C, packed)]
 pub struct DepositInstructionData {
     pub amount: u64,
     pub max_x: u64,
@@ -85,22 +84,24 @@ impl<'a> TryFrom<&'a [u8]> for DepositInstructionData {
             return Err(ProgramError::InvalidInstructionData);
         }
 
-        // This is safe because we checked the length and the struct is packed
-        let raw = unsafe { (data.as_ptr() as *const DepositInstructionData).read_unaligned() };
+        let amount = u64::from_le_bytes(data[0..8].try_into().unwrap());
+        let max_x = u64::from_le_bytes(data[8..16].try_into().unwrap());
+        let max_y = u64::from_le_bytes(data[16..24].try_into().unwrap());
+        let expiration = i64::from_le_bytes(data[24..32].try_into().unwrap());
 
-        if raw.amount == 0
-            || raw.max_x == 0
-            || raw.max_y == 0
-            || raw.expiration < Clock::get()?.unix_timestamp
+        if amount == 0
+            || max_x == 0
+            || max_y == 0
+            || expiration < Clock::get()?.unix_timestamp
         {
             return Err(ProgramError::InvalidInstructionData);
         }
 
         Ok(Self {
-            amount: u64::from_le(raw.amount),
-            max_x: u64::from_le(raw.max_x),
-            max_y: u64::from_le(raw.max_y),
-            expiration: i64::from_le(raw.expiration),
+            amount,
+            max_x,
+            max_y,
+            expiration,
         })
     }
 }
@@ -133,7 +134,7 @@ impl<'a> Deposit<'a> {
         let config = Config::load(self.accounts.config)?;
 
         // Check if we can deposit to the Amm
-        if config.state.ne(&(AmmState::Initialized as u8)) {
+        if config.state().ne(&(AmmState::Initialized as u8)) {
             return Err(ProgramError::InvalidAccountData);
         }
 
@@ -142,7 +143,7 @@ impl<'a> Deposit<'a> {
             &[
                 self.accounts.config.key(),
                 self.accounts.token_program.key(),
-                &config.mint_x,
+                config.mint_x(),
             ],
             &pinocchio_associated_token_account::ID,
         );
@@ -156,7 +157,7 @@ impl<'a> Deposit<'a> {
             &[
                 self.accounts.config.key(),
                 self.accounts.token_program.key(),
-                &config.mint_y,
+                config.mint_y(),
             ],
             &pinocchio_associated_token_account::ID,
         );
@@ -193,13 +194,14 @@ impl<'a> Deposit<'a> {
         }
 
         // Create the seeds
-        let seeds_binding = config.seed.to_le_bytes();
+        let seeds_binding = config.seed().to_le_bytes();
+        let config_bump = config.config_bump();
         let seeds = [
             Seed::from(b"config"),
             Seed::from(&seeds_binding),
-            Seed::from(&config.mint_x),
-            Seed::from(&config.mint_y),
-            Seed::from(&config.config_bump),
+            Seed::from(config.mint_x()),
+            Seed::from(config.mint_y()),
+            Seed::from(&config_bump),
         ];
 
         // Transfer the tokens to the vault

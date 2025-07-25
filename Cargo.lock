@@ -47,11 +47,11 @@ checksum = "7c33b58567c11b07749cefbb8320ac023f3387c57807aeb8e3b1262501b6e9f0"
 
 [[package]]
 name = "pinocchio-associated-token-account"
-version = "0.1.0"
+version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d998f46875eb2144e63a9dd3f70df3a4132885497b25c4bedbfab7d14c0628e8"
+checksum = "b45fffdec0a1d05199b0f67b6b802be32ffc30a5fe29d222d7653865ca57401c"
 dependencies = [
- "pinocchio 0.7.1",
+ "pinocchio 0.8.4",
  "pinocchio-pubkey",
 ]
 

@@ -1,7 +1,6 @@
 use crate::state::Config;
 use crate::AmmState;
 use constant_product_curve::{ConstantProduct, LiquidityPair};
-use pinocchio::log::sol_log_64;
 use core::mem::size_of;
 use pinocchio::instruction::Signer;
 use pinocchio::pubkey::find_program_address;
@@ -64,7 +63,6 @@ impl<'a> TryFrom<&'a [AccountInfo]> for SwapAccounts<'a> {
     }
 }
 
-#[repr(C, packed)]
 pub struct SwapInstructionData {
     pub is_x: bool,
     pub amount: u64,
@@ -76,22 +74,24 @@ impl<'a> TryFrom<&'a [u8]> for SwapInstructionData {
     type Error = ProgramError;
 
     fn try_from(data: &'a [u8]) -> Result<Self, Self::Error> {
-        if data.len().ne(&size_of::<SwapInstructionData>()) {
+        if data.len().ne(&(size_of::<bool>() + size_of::<u64>() + size_of::<u64>() + size_of::<i64>())) {
             return Err(ProgramError::InvalidInstructionData);
         }
 
-        // This is safe because we checked the length and the struct is packed
-        let raw = unsafe { (data.as_ptr() as *const SwapInstructionData).read_unaligned() };
+        let is_x = data[0] == 1;
+        let amount = u64::from_le_bytes(data[1..9].try_into().unwrap());
+        let min = u64::from_le_bytes(data[9..17].try_into().unwrap());
+        let expiration = i64::from_le_bytes(data[17..25].try_into().unwrap());
 
-        if raw.amount == 0 || raw.min == 0 || raw.expiration < Clock::get()?.unix_timestamp {
+        if amount == 0 || min == 0 || expiration < Clock::get()?.unix_timestamp {
             return Err(ProgramError::InvalidInstructionData);
         }
 
         Ok(Self {
-            is_x: raw.is_x,
-            amount: u64::from_le(raw.amount),
-            min: u64::from_le(raw.min),
-            expiration: i64::from_le(raw.expiration),
+            is_x,
+            amount,
+            min,
+            expiration,
         })
     }
 }
@@ -108,8 +108,6 @@ impl<'a> TryFrom<(&'a [u8], &'a [AccountInfo])> for Swap<'a> {
         let accounts = SwapAccounts::try_from(accounts)?;
         let instruction_data = SwapInstructionData::try_from(data)?;
 
-        sol_log_64(2, 0, 0, 0, 0);
-
         // Return the initialized struct
         Ok(Self {
             accounts,
@@ -125,7 +123,7 @@ impl<'a> Swap<'a> {
         let config = Config::load(self.accounts.config)?;
 
         // Check if we can swap in the Amm
-        if config.state.ne(&(AmmState::Initialized as u8)) {
+        if config.state().ne(&(AmmState::Initialized as u8)) {
             return Err(ProgramError::InvalidAccountData);
         }
 
@@ -134,7 +132,7 @@ impl<'a> Swap<'a> {
             &[
                 self.accounts.config.key(),
                 self.accounts.token_program.key(),
-                &config.mint_x,
+                config.mint_x(),
             ],
             &pinocchio_associated_token_account::ID,
         );
@@ -148,7 +146,7 @@ impl<'a> Swap<'a> {
             &[
                 self.accounts.config.key(),
                 self.accounts.token_program.key(),
-                &config.mint_y,
+                config.mint_y(),
             ],
             &pinocchio_associated_token_account::ID,
         );
@@ -166,7 +164,7 @@ impl<'a> Swap<'a> {
             vault_x.amount(),
             vault_y.amount(),
             vault_x.amount(),
-            config.fee,
+            config.fee(),
             None,
         )
         .map_err(|_| ProgramError::Custom(1))?;
@@ -186,13 +184,14 @@ impl<'a> Swap<'a> {
         }
 
         // Create the signer seeds
-        let seed_binding = config.seed.to_le_bytes();
+        let seed_binding = config.seed().to_le_bytes();
+        let config_bump = config.config_bump();
         let seeds = [
             Seed::from("config".as_bytes()),
             Seed::from(&seed_binding),
-            Seed::from(&config.mint_x),
-            Seed::from(&config.mint_y),
-            Seed::from(&config.config_bump),
+            Seed::from(config.mint_x()),
+            Seed::from(config.mint_y()),
+            Seed::from(&config_bump),
         ];
         let signer_seeds = [Signer::from(&seeds)];
 
