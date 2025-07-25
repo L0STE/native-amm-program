@@ -87,7 +87,7 @@ impl TryFrom<&[u8]> for InitializeInstructionData {
                     authority: Some(authority),
                 })
             }
-            INITIALIZE_DATA_LEN => {
+            INITIALIZE_DATA_LEN_WITHOUT_AUTHORITY => {
                 let seed = u64::from_le_bytes(data[0..8].try_into().unwrap());
                 let fee = u16::from_le_bytes(data[8..10].try_into().unwrap());
                 let mint_x = data[10..42].try_into().unwrap();
